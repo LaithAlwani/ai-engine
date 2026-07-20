@@ -7,6 +7,15 @@
 - **2026-07-19** — **Phase M shipped.** AI Engine landing page built ("Molten Engine" direction, `frontend-design` skill): hero with a live self-demonstrating assistant, platform tools, how-it-works, pricing tiers, FAQ, contact; `/services` + `/plans/[slug]`; direction-aware scroll navbar. Locked domain/deploy decision (1 repo → 1 Vercel project → many domains, `proxy.ts` hostname routing) + marketing performance guardrails.
 - **2026-07-20** — **Phase 0 shipped.** Convex + Convex Auth (Password) live; multi-tenant schema (`businesses`, `memberships`, `staff`, `platformAdmins`, `auditLog` + authTables, all `by_business_*`/`by_user_business` indexes); `convex/lib/authz.ts` (`requireMember`, `requirePlatformAdmin`, role hierarchy); onboarding action (owner membership + default calendar + hashed embed key); `proxy.ts` auth gate (`/dashboard`→`/signin` verified); `(app)` route group with Convex providers scoped out of marketing (marketing stays `○ Static`); sign-in + minimal dashboard harness. **Verified:** 4 `convex-test` isolation tests green (`npm test`). Seed the first operator with `npx convex run platform:seedAdmin '{"email":"…"}'`.
 
+## Build status
+- [x] **Phase M — Landing page** — "Molten Engine" marketing site: hero with a live self-demonstrating assistant, platform-tools grid, how-it-works + embed snippet, pricing tiers, FAQ, contact; `/services` + `/plans/[slug]`; direction-aware scroll navbar + progress line. Marketing stays `○ Static`.
+- [x] **Phase 0 — Tenancy foundation + auth** — Convex + Convex Auth (Password); multi-tenant schema (`businesses`, `memberships`, `staff`, `platformAdmins`, `auditLog` + authTables); `convex/lib/authz.ts` (`requireMember`, `requirePlatformAdmin`); onboarding action (owner membership + default calendar + hashed embed key); `proxy.ts` auth gate; `(app)` route group (Convex providers scoped out of marketing); sign-in + minimal dashboard. **4/4 isolation tests green.**
+- [ ] **Phase 1 — Knowledge, Chat, Dashboard** — dashboard shell `/dashboard/[businessSlug]` + business switcher + branding + Team page; per-tenant `knowledge`; per-tenant Leo prompt + real tool-use chat.
+- [ ] **Phase 2 — Booking, Leads, Email, SMS** — per-employee booking + assignment + per-employee Google OAuth; leads CRM; per-tenant email; Twilio SMS; cron fan-out.
+- [ ] **Widget** — `public/widget.js` + `app/embed` + tenant-scoped `/api/chat`,`/api/book` + durable rate limit.
+- [ ] **Platform portal** — cross-tenant support portal (`app/platform/*`) + audit log.
+- [ ] **Phase 3** — AI Employees, white-label, tiers, analytics.
+
 ## Context
 
 **AI Engine** is a greenfield multi-tenant AI platform (Next.js 16 / React 19 / Convex). Businesses sign up, connect their knowledge, and embed an AI assistant that **chats, books, and captures leads** on their own site — "paste one snippet." The platform ships a set of reusable, **tenant-scoped tools built once and shared by every business** ("never build the same feature twice"): AI Chat, Business Knowledge, Dashboard, Booking, Leads, Email, SMS, Analytics — plus per-business white-label branding and revenue tiers.
