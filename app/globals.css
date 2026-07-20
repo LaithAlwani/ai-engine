@@ -76,6 +76,26 @@
     letter-spacing: -0.015em;
     font-optical-sizing: auto;
   }
+
+  /* Native color inputs render a padded, bordered swatch — strip it so the
+     element itself is a clean, fully-filled square. */
+  input[type="color"] {
+    -webkit-appearance: none;
+    appearance: none;
+    padding: 0;
+    background: transparent;
+  }
+  input[type="color"]::-webkit-color-swatch-wrapper {
+    padding: 0;
+  }
+  input[type="color"]::-webkit-color-swatch {
+    border: none;
+    border-radius: 0.4rem;
+  }
+  input[type="color"]::-moz-color-swatch {
+    border: none;
+    border-radius: 0.4rem;
+  }
 }
 
 /* ---------------------------------------------------------------------------

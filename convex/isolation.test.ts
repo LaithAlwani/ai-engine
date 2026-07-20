@@ -28,6 +28,7 @@ test("tenant isolation — a member of one business cannot read another's", asyn
     tier: "starter",
     embedKeyPrefix: "aaaaaa",
     embedKeyHash: "hash-a",
+    embedKey: "ek_aaaaaa.a",
   });
   await asB.mutation(internal.businesses.provision, {
     name: "Beta Co",
@@ -35,6 +36,7 @@ test("tenant isolation — a member of one business cannot read another's", asyn
     tier: "starter",
     embedKeyPrefix: "bbbbbb",
     embedKeyHash: "hash-b",
+    embedKey: "ek_bbbbbb.b",
   });
 
   // The switcher shows each user ONLY their own business.
@@ -72,6 +74,7 @@ test("onboarding — creator becomes owner with a default staff calendar", async
     tier: "starter",
     embedKeyPrefix: "cccccc",
     embedKeyHash: "hash-c",
+    embedKey: "ek_cccccc.c",
   });
 
   const { membership, staff } = await t.run(async (ctx) => {
@@ -101,7 +104,7 @@ test("onboarding — duplicate slug is rejected", async () => {
 
   await t.withIdentity({ subject: `${u1}|s` }).mutation(
     internal.businesses.provision,
-    { name: "First", slug: "taken", tier: "starter", embedKeyPrefix: "p1", embedKeyHash: "h1" },
+    { name: "First", slug: "taken", tier: "starter", embedKeyPrefix: "p1", embedKeyHash: "h1", embedKey: "ek_p1.a" },
   );
   await expect(
     t.withIdentity({ subject: `${u2}|s` }).mutation(internal.businesses.provision, {
@@ -110,6 +113,7 @@ test("onboarding — duplicate slug is rejected", async () => {
       tier: "starter",
       embedKeyPrefix: "p2",
       embedKeyHash: "h2",
+      embedKey: "ek_p2.b",
     }),
   ).rejects.toThrow(/taken/i);
 });

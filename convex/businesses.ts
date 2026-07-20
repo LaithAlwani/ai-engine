@@ -2,39 +2,27 @@ import { v } from "convex/values";
 import {
   action,
   internalMutation,
+  internalQuery,
+  mutation,
   query,
 } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { requireMember } from "./lib/authz";
+import { generateEmbedKey } from "./lib/keys";
 import { tierValidator } from "./schema";
 
 // -----------------------------------------------------------------------------
 // Businesses — the tenant lifecycle. Onboarding is the ONE path in: create a
-// business → owner membership → default calendar slot → hashed embed key.
+// business → owner membership → default calendar slot → embed key.
 // The first client comes through the same funnel as the hundredth.
 // -----------------------------------------------------------------------------
 
 const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{1,38}[a-z0-9])?$/;
 
-function randomHex(bytes: number): string {
-  const arr = new Uint8Array(bytes);
-  crypto.getRandomValues(arr);
-  return Array.from(arr, (b) => b.toString(16).padStart(2, "0")).join("");
-}
-
-async function sha256Hex(input: string): Promise<string> {
-  const data = new TextEncoder().encode(input);
-  const digest = await crypto.subtle.digest("SHA-256", data);
-  return Array.from(new Uint8Array(digest), (b) =>
-    b.toString(16).padStart(2, "0"),
-  ).join("");
-}
-
 /**
  * Create a business for the signed-in user (who becomes its owner). Generates
  * the embed key here (needs Web Crypto), then provisions rows in one mutation.
- * The full embed key is returned ONCE — only its hash is stored.
  */
 export const create = action({
   args: {
@@ -58,11 +46,7 @@ export const create = action({
       );
     }
 
-    // ek_<prefix>.<secret> — prefix is stored plaintext for lookup, secret hashed.
-    const prefix = randomHex(6);
-    const secret = randomHex(18);
-    const embedKey = `ek_${prefix}.${secret}`;
-    const embedKeyHash = await sha256Hex(secret);
+    const { key: embedKey, prefix, hash } = await generateEmbedKey();
 
     const businessId: import("./_generated/dataModel").Id<"businesses"> =
       await ctx.runMutation(internal.businesses.provision, {
@@ -70,7 +54,8 @@ export const create = action({
         slug,
         tier: args.tier ?? "starter",
         embedKeyPrefix: prefix,
-        embedKeyHash,
+        embedKeyHash: hash,
+        embedKey,
       });
 
     return { businessId, slug, embedKey };
@@ -85,6 +70,7 @@ export const provision = internalMutation({
     tier: tierValidator,
     embedKeyPrefix: v.string(),
     embedKeyHash: v.string(),
+    embedKey: v.string(),
   },
   returns: v.id("businesses"),
   handler: async (ctx, args) => {
@@ -105,6 +91,7 @@ export const provision = internalMutation({
       domains: [],
       embedKeyPrefix: args.embedKeyPrefix,
       embedKeyHash: args.embedKeyHash,
+      embedKey: args.embedKey,
       branding: {
         primaryColor: "#FF5C1A",
         accentColor: "#FFB347",
@@ -155,7 +142,13 @@ export const listMine = query({
     const rows = await Promise.all(
       memberships.map(async (m) => {
         const business = await ctx.db.get(m.businessId);
-        return business ? { ...business, role: m.role } : null;
+        if (!business) return null;
+        // Never ship the raw key or its hash to the client — the prefix (for a
+        // masked display) is fine; the full key comes only via revealEmbedKey.
+        const { embedKey, embedKeyHash, ...safe } = business;
+        void embedKey;
+        void embedKeyHash;
+        return { ...safe, role: m.role };
       }),
     );
     return rows.filter((r): r is NonNullable<typeof r> => r !== null);
@@ -174,6 +167,102 @@ export const getBySlug = query({
 
     // Throws unless the caller is a member — cross-tenant reads are refused here.
     await requireMember(ctx, business._id);
-    return business;
+    const { embedKey, embedKeyHash, ...safe } = business;
+    void embedKey;
+    void embedKeyHash;
+    return safe;
+  },
+});
+
+/** Update a business's white-label branding (manager only). */
+export const updateBranding = mutation({
+  args: {
+    slug: v.string(),
+    branding: v.object({
+      primaryColor: v.string(),
+      accentColor: v.string(),
+      position: v.union(v.literal("left"), v.literal("right")),
+      assistantName: v.string(),
+      welcomeMsg: v.string(),
+      tone: v.string(),
+      chatIcon: v.optional(v.string()),
+    }),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const business = await ctx.db
+      .query("businesses")
+      .withIndex("by_slug", (q) => q.eq("slug", args.slug))
+      .unique();
+    if (!business) throw new Error("Business not found");
+    await requireMember(ctx, business._id, "admin");
+
+    // Spread existing first so fields not edited here (e.g. logoStorageId) survive.
+    await ctx.db.patch(business._id, {
+      branding: { ...business.branding, ...args.branding },
+    });
+    return null;
+  },
+});
+
+/**
+ * Internal: data the embed-key reveal/rotate actions need — the caller's stored
+ * password hash (for verification) + the current key. Never exposed to clients.
+ */
+export const revealData = internalQuery({
+  args: { slug: v.string() },
+  returns: v.object({
+    businessId: v.id("businesses"),
+    embedKey: v.union(v.string(), v.null()),
+    storedHash: v.union(v.string(), v.null()),
+  }),
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+
+    const business = await ctx.db
+      .query("businesses")
+      .withIndex("by_slug", (q) => q.eq("slug", args.slug))
+      .unique();
+    if (!business) throw new Error("Business not found");
+    await requireMember(ctx, business._id);
+
+    const user = await ctx.db.get(userId);
+    let storedHash: string | null = null;
+    if (user?.email) {
+      const account = await ctx.db
+        .query("authAccounts")
+        .withIndex("providerAndAccountId", (q) =>
+          q.eq("provider", "password").eq("providerAccountId", user.email!),
+        )
+        .unique();
+      storedHash = account?.secret ?? null;
+    }
+
+    return {
+      businessId: business._id,
+      embedKey: business.embedKey ?? null,
+      storedHash,
+    };
+  },
+});
+
+/** Internal: swap in a freshly generated key (manager only). */
+export const applyEmbedKeyRotation = internalMutation({
+  args: {
+    businessId: v.id("businesses"),
+    embedKey: v.string(),
+    embedKeyPrefix: v.string(),
+    embedKeyHash: v.string(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    await requireMember(ctx, args.businessId, "admin");
+    await ctx.db.patch(args.businessId, {
+      embedKey: args.embedKey,
+      embedKeyPrefix: args.embedKeyPrefix,
+      embedKeyHash: args.embedKeyHash,
+    });
+    return null;
   },
 });

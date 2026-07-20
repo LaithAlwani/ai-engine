@@ -11,8 +11,10 @@
 import type * as auth from "../auth.js";
 import type * as businesses from "../businesses.js";
 import type * as emailNode from "../emailNode.js";
+import type * as embedKeys from "../embedKeys.js";
 import type * as http from "../http.js";
 import type * as lib_authz from "../lib/authz.js";
+import type * as lib_keys from "../lib/keys.js";
 import type * as passwordReset from "../passwordReset.js";
 import type * as platform from "../platform.js";
 
@@ -26,8 +28,10 @@ declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   businesses: typeof businesses;
   emailNode: typeof emailNode;
+  embedKeys: typeof embedKeys;
   http: typeof http;
   "lib/authz": typeof lib_authz;
+  "lib/keys": typeof lib_keys;
   passwordReset: typeof passwordReset;
   platform: typeof platform;
 }>;

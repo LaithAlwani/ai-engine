@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useQuery, useAction } from "convex/react";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { api } from "@/convex/_generated/api";
@@ -86,9 +87,10 @@ export default function DashboardHome() {
             </p>
           )}
           {businesses?.map((b) => (
-            <div
+            <Link
               key={b._id}
-              className="flex items-center justify-between rounded-xl border border-line bg-surface/60 px-5 py-4"
+              href={`/dashboard/${b.slug}`}
+              className="flex items-center justify-between rounded-xl border border-line bg-surface/60 px-5 py-4 transition-colors hover:border-ember/40 hover:bg-surface"
             >
               <div>
                 <p className="text-bone">{b.name}</p>
@@ -99,7 +101,7 @@ export default function DashboardHome() {
               <span className="rounded-full border border-line-strong px-3 py-1 font-mono text-xs text-muted">
                 {b.status}
               </span>
-            </div>
+            </Link>
           ))}
         </div>
 

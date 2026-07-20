@@ -39,6 +39,7 @@ export default defineSchema({
     domains: v.array(v.string()),
     embedKeyHash: v.string(),
     embedKeyPrefix: v.string(), // fast lookup; the secret half is hashed
+    embedKey: v.optional(v.string()), // full publishable key, revealed behind a password gate
     branding: v.object({
       logoStorageId: v.optional(v.id("_storage")),
       primaryColor: v.string(),
