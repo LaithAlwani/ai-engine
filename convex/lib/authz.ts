@@ -1,6 +1,7 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import type { QueryCtx } from "../_generated/server";
 import type { Doc, Id } from "../_generated/dataModel";
+import { appError } from "./errors";
 
 // -----------------------------------------------------------------------------
 // Authorization — the single place identity turns into permission. Every
@@ -17,7 +18,7 @@ const RANK: Record<Role, number> = { staff: 1, admin: 2, owner: 3 };
 
 async function currentUserId(ctx: QueryCtx): Promise<Id<"users">> {
   const userId = await getAuthUserId(ctx);
-  if (!userId) throw new Error("Not authenticated");
+  if (!userId) appError("UNAUTHENTICATED", "Please sign in to continue.");
   return userId;
 }
 
@@ -38,14 +39,38 @@ export async function requireMember(
     )
     .unique();
 
-  if (!membership) throw new Error("Not a member of this business");
+  if (!membership) {
+    appError("FORBIDDEN", "You're not a member of this business.");
+  }
   if (RANK[membership.role] < RANK[minRole]) {
-    throw new Error(`Requires ${minRole} role or higher`);
+    appError("FORBIDDEN", `This action needs ${minRole} access or higher.`);
   }
   return { userId, membership };
 }
 
 export const isManager = (role: Role) => RANK[role] >= RANK.admin;
+
+/**
+ * Resolve a business by slug and require membership in one step — the common
+ * shape for dashboard functions that take a `slug` argument.
+ */
+export async function requireMemberBySlug(
+  ctx: QueryCtx,
+  slug: string,
+  minRole: Role = "staff",
+): Promise<{
+  business: Doc<"businesses">;
+  userId: Id<"users">;
+  membership: Doc<"memberships">;
+}> {
+  const business = await ctx.db
+    .query("businesses")
+    .withIndex("by_slug", (q) => q.eq("slug", slug))
+    .unique();
+  if (!business) appError("NOT_FOUND", "That business doesn't exist.");
+  const { userId, membership } = await requireMember(ctx, business._id, minRole);
+  return { business, userId, membership };
+}
 
 /**
  * Require the caller to be a platform operator. `superadmin` gates assist/act-as;
@@ -62,9 +87,9 @@ export async function requirePlatformAdmin(
     .withIndex("by_user", (q) => q.eq("userId", userId))
     .unique();
 
-  if (!admin) throw new Error("Not a platform admin");
+  if (!admin) appError("FORBIDDEN", "You don't have platform access.");
   if (minRole === "superadmin" && admin.role !== "superadmin") {
-    throw new Error("Requires superadmin");
+    appError("FORBIDDEN", "This action needs superadmin access.");
   }
   return { userId, admin };
 }

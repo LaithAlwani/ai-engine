@@ -8,6 +8,9 @@ function navItems(slug: string) {
   return [
     { label: "Overview", href: `/dashboard/${slug}`, exact: true },
     { label: "Branding", href: `/dashboard/${slug}/branding`, exact: false },
+    { label: "Team", href: `/dashboard/${slug}/team`, exact: false },
+    { label: "Knowledge", href: `/dashboard/${slug}/knowledge`, exact: false },
+    { label: "Assistant", href: `/dashboard/${slug}/assistant`, exact: false },
   ];
 }
 

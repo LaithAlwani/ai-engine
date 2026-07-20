@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useAction } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { errorText } from "@/lib/errors";
 import {
   useBusiness,
   isManagerRole,
@@ -41,7 +42,7 @@ export function WidgetKeyCard() {
       setPrompt(null);
       setPassword("");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong.");
+      setError(errorText(err));
     } finally {
       setPending(false);
     }

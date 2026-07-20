@@ -9,6 +9,7 @@ import {
 import { internal } from "./_generated/api";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { requireMember } from "./lib/authz";
+import { appError } from "./lib/errors";
 import { generateEmbedKey } from "./lib/keys";
 import { tierValidator } from "./schema";
 
@@ -37,12 +38,13 @@ export const create = action({
   }),
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
-    if (!userId) throw new Error("Not authenticated");
+    if (!userId) appError("UNAUTHENTICATED", "Please sign in to continue.");
 
     const slug = args.slug.trim().toLowerCase();
     if (!SLUG_RE.test(slug)) {
-      throw new Error(
-        "Slug must be 2–40 chars: lowercase letters, numbers, and hyphens",
+      appError(
+        "INVALID_INPUT",
+        "Slug must be 2–40 characters: lowercase letters, numbers, and hyphens.",
       );
     }
 
@@ -75,13 +77,13 @@ export const provision = internalMutation({
   returns: v.id("businesses"),
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
-    if (!userId) throw new Error("Not authenticated");
+    if (!userId) appError("UNAUTHENTICATED", "Please sign in to continue.");
 
     const existing = await ctx.db
       .query("businesses")
       .withIndex("by_slug", (q) => q.eq("slug", args.slug))
       .unique();
-    if (existing) throw new Error(`Slug "${args.slug}" is taken`);
+    if (existing) appError("CONFLICT", `The slug "${args.slug}" is already taken.`);
 
     const businessId = await ctx.db.insert("businesses", {
       name: args.name,
@@ -194,7 +196,7 @@ export const updateBranding = mutation({
       .query("businesses")
       .withIndex("by_slug", (q) => q.eq("slug", args.slug))
       .unique();
-    if (!business) throw new Error("Business not found");
+    if (!business) appError("NOT_FOUND", "That business doesn't exist.");
     await requireMember(ctx, business._id, "admin");
 
     // Spread existing first so fields not edited here (e.g. logoStorageId) survive.
@@ -218,13 +220,13 @@ export const revealData = internalQuery({
   }),
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
-    if (!userId) throw new Error("Not authenticated");
+    if (!userId) appError("UNAUTHENTICATED", "Please sign in to continue.");
 
     const business = await ctx.db
       .query("businesses")
       .withIndex("by_slug", (q) => q.eq("slug", args.slug))
       .unique();
-    if (!business) throw new Error("Business not found");
+    if (!business) appError("NOT_FOUND", "That business doesn't exist.");
     await requireMember(ctx, business._id);
 
     const user = await ctx.db.get(userId);

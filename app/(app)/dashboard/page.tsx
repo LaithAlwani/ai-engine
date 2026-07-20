@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useQuery, useAction } from "convex/react";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { api } from "@/convex/_generated/api";
+import { errorText } from "@/lib/errors";
 import { Logo } from "@/components/layout/logo";
 
 function slugify(s: string) {
@@ -39,7 +40,7 @@ export default function DashboardHome() {
       setSlug("");
       setSlugTouched(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong.");
+      setError(errorText(err));
     } finally {
       setPending(false);
     }

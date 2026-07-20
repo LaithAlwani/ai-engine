@@ -52,12 +52,12 @@ test("tenant isolation — a member of one business cannot read another's", asyn
   // THE BOUNDARY: B cannot read A's business.
   await expect(
     asB.query(api.businesses.getBySlug, { slug: "alpha" }),
-  ).rejects.toThrow(/member/i);
+  ).rejects.toMatchObject({ data: { code: "FORBIDDEN" } });
 
   // And an unauthenticated caller cannot read it either.
   await expect(
     t.query(api.businesses.getBySlug, { slug: "alpha" }),
-  ).rejects.toThrow(/authenticated|member/i);
+  ).rejects.toMatchObject({ data: { code: "UNAUTHENTICATED" } });
 });
 
 // Onboarding creates the owner membership + a default calendar in one shot.
@@ -115,7 +115,7 @@ test("onboarding — duplicate slug is rejected", async () => {
       embedKeyHash: "h2",
       embedKey: "ek_p2.b",
     }),
-  ).rejects.toThrow(/taken/i);
+  ).rejects.toMatchObject({ data: { code: "CONFLICT" } });
 });
 
 // The platform plane is gated: ordinary users can't run cross-tenant reads.
@@ -126,5 +126,67 @@ test("platform gate — a non-admin cannot list all businesses", async () => {
   );
   await expect(
     t.withIdentity({ subject: `${user}|s` }).query(api.platform.listBusinesses, {}),
-  ).rejects.toThrow(/platform admin/i);
+  ).rejects.toMatchObject({ data: { code: "FORBIDDEN" } });
+});
+
+// Owners outrank admins: an admin can manage staff/admins but not owners.
+test("owner protection — an admin cannot remove or re-role an owner", async () => {
+  const t = convexTest(schema, modules);
+  const ownerU = await t.run((ctx) =>
+    ctx.db.insert("users", { email: "owner@x.com" }),
+  );
+  await t.run((ctx) => ctx.db.insert("users", { email: "admin@x.com" }));
+  const asOwner = t.withIdentity({ subject: `${ownerU}|s` });
+
+  await asOwner.mutation(internal.businesses.provision, {
+    name: "Acme",
+    slug: "acme",
+    tier: "starter",
+    embedKeyPrefix: "zz",
+    embedKeyHash: "h",
+    embedKey: "ek_zz.z",
+  });
+  await asOwner.mutation(api.team.addMember, {
+    slug: "acme",
+    email: "admin@x.com",
+    role: "admin",
+  });
+
+  const members = await asOwner.query(api.team.listMembers, { slug: "acme" });
+  const ownerM = members.find((m) => m.role === "owner")!;
+  const adminM = members.find((m) => m.role === "admin")!;
+
+  const adminUser = await t.run((ctx) =>
+    ctx.db
+      .query("users")
+      .withIndex("email", (q) => q.eq("email", "admin@x.com"))
+      .unique(),
+  );
+  const admin = t.withIdentity({ subject: `${adminUser!._id}|s` });
+
+  // Admin can't remove the owner…
+  await expect(
+    admin.mutation(api.team.removeMember, {
+      slug: "acme",
+      membershipId: ownerM.membershipId,
+    }),
+  ).rejects.toMatchObject({ data: { code: "FORBIDDEN" } });
+
+  // …can't demote the owner…
+  await expect(
+    admin.mutation(api.team.updateMemberRole, {
+      slug: "acme",
+      membershipId: ownerM.membershipId,
+      role: "staff",
+    }),
+  ).rejects.toMatchObject({ data: { code: "FORBIDDEN" } });
+
+  // …and can't promote anyone to owner.
+  await expect(
+    admin.mutation(api.team.updateMemberRole, {
+      slug: "acme",
+      membershipId: adminM.membershipId,
+      role: "owner",
+    }),
+  ).rejects.toMatchObject({ data: { code: "FORBIDDEN" } });
 });

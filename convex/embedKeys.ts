@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { Scrypt } from "lucia";
 import { action } from "./_generated/server";
 import { internal } from "./_generated/api";
+import { appError } from "./lib/errors";
 import { generateEmbedKey } from "./lib/keys";
 
 // -----------------------------------------------------------------------------
@@ -25,7 +26,7 @@ export const reveal = action({
       slug: args.slug,
     });
     if (!(await passwordOk(data.storedHash, args.password))) {
-      throw new Error("Incorrect password.");
+      appError("INVALID_CREDENTIALS", "Incorrect password.");
     }
     return { key: data.embedKey };
   },
@@ -39,7 +40,7 @@ export const rotate = action({
       slug: args.slug,
     });
     if (!(await passwordOk(data.storedHash, args.password))) {
-      throw new Error("Incorrect password.");
+      appError("INVALID_CREDENTIALS", "Incorrect password.");
     }
     const { key, prefix, hash } = await generateEmbedKey();
     await ctx.runMutation(internal.businesses.applyEmbedKeyRotation, {

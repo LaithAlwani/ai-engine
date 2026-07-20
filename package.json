@@ -10,6 +10,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.112.3",
     "@auth/core": "^0.41.1",
     "@convex-dev/auth": "^0.0.94",
     "convex": "^1.42.3",

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { errorText } from "@/lib/errors";
 import {
   useBusiness,
   isManagerRole,
@@ -67,7 +68,7 @@ export default function BrandingPage() {
       await updateBranding({ slug: b.slug, branding: form });
       setSaved(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Couldn't save.");
+      setError(errorText(err));
     } finally {
       setPending(false);
     }

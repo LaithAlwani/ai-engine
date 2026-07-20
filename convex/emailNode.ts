@@ -2,6 +2,7 @@
 
 import { v } from "convex/values";
 import { internalAction } from "./_generated/server";
+import { appError } from "./lib/errors";
 import nodemailer from "nodemailer";
 
 // Node-runtime email sending (Nodemailer over SMTP). Kept in its own file so no
@@ -17,7 +18,8 @@ export const sendPasswordResetEmail = internalAction({
   handler: async (_ctx, { to, url }) => {
     const host = process.env.SMTP_HOST;
     if (!host) {
-      throw new Error(
+      appError(
+        "CONFIG",
         "SMTP is not configured — set SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, MAIL_FROM on the Convex deployment.",
       );
     }

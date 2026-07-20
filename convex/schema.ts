@@ -95,6 +95,27 @@ export default defineSchema({
     createdAt: v.number(),
   }).index("by_user", ["userId"]),
 
+  // Per-tenant business knowledge — the assistant's source of truth. One row
+  // per business; edited in the dashboard, injected into the Leo system prompt.
+  knowledge: defineTable({
+    businessId: v.id("businesses"),
+    about: v.string(),
+    services: v.array(
+      v.object({ name: v.string(), description: v.optional(v.string()) }),
+    ),
+    pricing: v.string(),
+    hours: v.string(),
+    locations: v.array(
+      v.object({
+        name: v.optional(v.string()),
+        address: v.string(),
+        phone: v.optional(v.string()),
+      }),
+    ),
+    faq: v.array(v.object({ q: v.string(), a: v.string() })),
+    policies: v.string(),
+  }).index("by_business", ["businessId"]),
+
   // Single-use, hashed password-reset tokens (custom flow so the reset LINK
   // works cross-device — the built-in flow binds the code to the requesting
   // browser via a verifier, which an email link can't carry).

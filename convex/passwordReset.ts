@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { action, internalMutation } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { modifyAccountCredentials } from "@convex-dev/auth/server";
+import { appError } from "./lib/errors";
 
 // -----------------------------------------------------------------------------
 // Custom password-reset flow. Unlike Convex Auth's built-in reset (which binds
@@ -90,7 +91,7 @@ export const resetPassword = action({
   returns: v.object({ email: v.string() }),
   handler: async (ctx, args): Promise<{ email: string }> => {
     if (args.newPassword.length < 8) {
-      throw new Error("Password must be at least 8 characters.");
+      appError("INVALID_INPUT", "Password must be at least 8 characters.");
     }
     const tokenHash = await sha256Hex(args.token);
     const email: string | null = await ctx.runMutation(
@@ -98,7 +99,10 @@ export const resetPassword = action({
       { tokenHash },
     );
     if (email === null) {
-      throw new Error("This reset link is invalid or has expired.");
+      appError(
+        "INVALID_CREDENTIALS",
+        "This reset link is invalid or has expired.",
+      );
     }
 
     await modifyAccountCredentials(ctx, {

@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { internalMutation, query } from "./_generated/server";
 import { requirePlatformAdmin } from "./lib/authz";
+import { appError } from "./lib/errors";
 
 // -----------------------------------------------------------------------------
 // Platform plane — cross-tenant, operators only. Every read starts with
@@ -26,7 +27,7 @@ export const seedAdmin = internalMutation({
       .withIndex("email", (q) => q.eq("email", args.email))
       .unique();
     if (!user) {
-      throw new Error(`No user with email ${args.email} — sign up first`);
+      appError("NOT_FOUND", `No user with email ${args.email} — sign up first.`);
     }
 
     const existing = await ctx.db

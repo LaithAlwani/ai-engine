@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useAction } from "convex/react";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { api } from "@/convex/_generated/api";
+import { errorText } from "@/lib/errors";
 import { Logo } from "@/components/layout/logo";
 
 function ResetForm() {
@@ -41,11 +42,7 @@ function ResetForm() {
       await signIn("password", { email, password: newPassword, flow: "signIn" });
       router.push("/dashboard");
     } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "This reset link is invalid or has expired.",
-      );
+      setError(errorText(err));
       setPending(false);
     }
   }

@@ -1,0 +1,96 @@
+import { v } from "convex/values";
+import { mutation, query } from "./_generated/server";
+import { requireMemberBySlug } from "./lib/authz";
+import { appError } from "./lib/errors";
+
+// -----------------------------------------------------------------------------
+// Staff — bookable resources/calendars under a business. A staff member may be
+// login-less (no `userId`) — a manager-managed calendar. Phase 2 hangs
+// per-employee availability + Google Calendar off these rows.
+// -----------------------------------------------------------------------------
+
+export const list = query({
+  args: { slug: v.string() },
+  handler: async (ctx, args) => {
+    const { business } = await requireMemberBySlug(ctx, args.slug);
+    const rows = await ctx.db
+      .query("staff")
+      .withIndex("by_business", (q) => q.eq("businessId", business._id))
+      .collect();
+    return rows.sort((a, b) => a.order - b.order);
+  },
+});
+
+export const add = mutation({
+  args: {
+    slug: v.string(),
+    name: v.string(),
+    title: v.optional(v.string()),
+    bookable: v.boolean(),
+  },
+  returns: v.id("staff"),
+  handler: async (ctx, args) => {
+    const { business } = await requireMemberBySlug(ctx, args.slug, "admin");
+    const existing = await ctx.db
+      .query("staff")
+      .withIndex("by_business", (q) => q.eq("businessId", business._id))
+      .collect();
+    const order = existing.reduce((max, s) => Math.max(max, s.order), -1) + 1;
+
+    return await ctx.db.insert("staff", {
+      businessId: business._id,
+      name: args.name.trim(),
+      title: args.title?.trim() || undefined,
+      bookable: args.bookable,
+      active: true,
+      order,
+    });
+  },
+});
+
+export const update = mutation({
+  args: {
+    slug: v.string(),
+    staffId: v.id("staff"),
+    name: v.optional(v.string()),
+    title: v.optional(v.string()),
+    bookable: v.optional(v.boolean()),
+    active: v.optional(v.boolean()),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const { business } = await requireMemberBySlug(ctx, args.slug, "admin");
+    const staff = await ctx.db.get(args.staffId);
+    if (!staff || staff.businessId !== business._id) {
+      appError("NOT_FOUND", "That staff member no longer exists.");
+    }
+
+    const patch: {
+      name?: string;
+      title?: string | undefined;
+      bookable?: boolean;
+      active?: boolean;
+    } = {};
+    if (args.name !== undefined) patch.name = args.name.trim();
+    if (args.title !== undefined) patch.title = args.title.trim() || undefined;
+    if (args.bookable !== undefined) patch.bookable = args.bookable;
+    if (args.active !== undefined) patch.active = args.active;
+
+    await ctx.db.patch(args.staffId, patch);
+    return null;
+  },
+});
+
+export const remove = mutation({
+  args: { slug: v.string(), staffId: v.id("staff") },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const { business } = await requireMemberBySlug(ctx, args.slug, "admin");
+    const staff = await ctx.db.get(args.staffId);
+    if (!staff || staff.businessId !== business._id) {
+      appError("NOT_FOUND", "That staff member no longer exists.");
+    }
+    await ctx.db.delete(args.staffId);
+    return null;
+  },
+});
