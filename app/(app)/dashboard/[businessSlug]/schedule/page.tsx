@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useMutation, useQuery } from "convex/react";
+import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { errorText } from "@/lib/errors";
@@ -159,6 +159,9 @@ function AvailabilityEditor({
 
   return (
     <div className="mt-8">
+      <GoogleCalendar slug={slug} staffId={staffId} />
+
+      <p className="mb-2 text-sm text-bone-dim">Weekly hours</p>
       <fieldset disabled={!canEdit || pending} className="space-y-2">
         {DAYS.map((label, d) => (
           <div
@@ -281,6 +284,110 @@ function AvailabilityEditor({
           {error && <span className="text-sm text-ember-deep">{error}</span>}
         </div>
       )}
+    </div>
+  );
+}
+
+function GoogleCalendar({
+  slug,
+  staffId,
+}: {
+  slug: string;
+  staffId: Id<"staff">;
+}) {
+  const status = useQuery(api.google.status, { slug, staffId });
+  const getAuthUrl = useAction(api.google.getAuthUrl);
+  const disconnect = useAction(api.google.disconnect);
+  const sync = useAction(api.google.syncBusy);
+  const [busy, setBusy] = useState<null | "connect" | "sync" | "disconnect">(
+    null,
+  );
+  const [error, setError] = useState<string | null>(null);
+  const [synced, setSynced] = useState(false);
+
+  async function connect() {
+    setError(null);
+    setBusy("connect");
+    try {
+      const { url } = await getAuthUrl({ slug, staffId });
+      window.location.href = url;
+    } catch (e) {
+      setError(errorText(e));
+      setBusy(null);
+    }
+  }
+
+  async function run(
+    kind: "sync" | "disconnect",
+    fn: () => Promise<unknown>,
+  ) {
+    setError(null);
+    setBusy(kind);
+    setSynced(false);
+    try {
+      await fn();
+      if (kind === "sync") setSynced(true);
+    } catch (e) {
+      setError(errorText(e));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <div className="mb-6 rounded-xl border border-line bg-surface/40 p-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="text-sm text-bone">Google Calendar</p>
+          <p className="mt-0.5 text-xs text-faint">
+            {status === undefined
+              ? "…"
+              : status.connected
+                ? `Connected${status.email ? ` · ${status.email}` : ""} — busy times block slots.`
+                : "Not connected — external events won't block slots yet."}
+          </p>
+        </div>
+        {status !== undefined && !status.canManage && !status.connected && (
+          <span className="text-xs text-faint">
+            {status.hasLogin
+              ? "This employee connects their own calendar."
+              : "An owner connects this calendar."}
+          </span>
+        )}
+        {status !== undefined && status.canManage && (
+          <div className="flex items-center gap-2">
+            {status.connected ? (
+              <>
+                <button
+                  onClick={() => run("sync", () => sync({ slug, staffId }))}
+                  disabled={busy !== null}
+                  className="rounded-full border border-line-strong px-3.5 py-1.5 text-sm text-bone-dim transition-colors hover:border-ember/50 hover:text-bone disabled:opacity-50"
+                >
+                  {busy === "sync" ? "Syncing…" : synced ? "Synced ✓" : "Sync now"}
+                </button>
+                <button
+                  onClick={() =>
+                    run("disconnect", () => disconnect({ slug, staffId }))
+                  }
+                  disabled={busy !== null}
+                  className="text-sm text-muted transition-colors hover:text-ember-deep disabled:opacity-50"
+                >
+                  Disconnect
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={connect}
+                disabled={busy !== null}
+                className="rounded-full bg-ember px-4 py-1.5 text-sm font-medium text-[#160b04] transition-colors hover:bg-flare disabled:opacity-60"
+              >
+                {busy === "connect" ? "Redirecting…" : "Connect Google Calendar"}
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+      {error && <p className="mt-2 text-sm text-ember-deep">{error}</p>}
     </div>
   );
 }

@@ -42,9 +42,18 @@ async function ruleAndBusy(
       q.eq("staffId", staffId).gte("start", start - DAY_MS).lt("start", start + DAY_MS),
     )
     .collect();
-  const busy = rows
+  const busy: Span[] = rows
     .filter((b) => b.status === "confirmed" && b._id !== excludeId)
     .map((b) => ({ start: b.start, end: b.end }));
+
+  const gbusy = await ctx.db
+    .query("googleBusy")
+    .withIndex("by_staff_start", (q) =>
+      q.eq("staffId", staffId).gte("start", start - DAY_MS).lt("start", start + DAY_MS),
+    )
+    .collect();
+  for (const g of gbusy) busy.push({ start: g.start, end: g.end });
+
   return { rule, busy };
 }
 

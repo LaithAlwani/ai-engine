@@ -156,6 +156,34 @@ test("reschedule — moves the booking and frees the old slot", async () => {
   expect(starts).not.toContain(START + HOUR); // 10:00 now taken
 });
 
+test("google busy — an external busy span blocks the slot", async () => {
+  const { t, as, staffId } = await setup();
+  await t.run(async (ctx) => {
+    const business = await ctx.db
+      .query("businesses")
+      .withIndex("by_slug", (q) => q.eq("slug", "clip"))
+      .unique();
+    await ctx.db.insert("googleBusy", {
+      businessId: business!._id,
+      staffId,
+      start: START,
+      end: START + HOUR,
+    });
+  });
+
+  const slots = await as.query(api.slots.getSlots, {
+    slug: "clip",
+    staffId,
+    fromMs: START - HOUR,
+    days: 1,
+  });
+  expect(slots.map((s) => s.start)).not.toContain(START);
+
+  await expect(
+    as.mutation(internal.bookings.create, bookArgs(staffId, START, "t1")),
+  ).rejects.toMatchObject({ data: { code: "CONFLICT" } });
+});
+
 test("reschedule — onto an already-booked slot is rejected", async () => {
   const { as, staffId } = await setup();
   const a = await as.mutation(internal.bookings.create, bookArgs(staffId, START, "t1"));

@@ -119,6 +119,29 @@ export default defineSchema({
     .index("by_business_start", ["businessId", "start"])
     .index("by_cancelToken", ["cancelToken"]),
 
+  // Per-staff Google Calendar connection (OAuth tokens). One row per staff.
+  googleTokens: defineTable({
+    businessId: v.id("businesses"),
+    staffId: v.id("staff"),
+    accessToken: v.string(),
+    refreshToken: v.string(),
+    expiryMs: v.number(),
+    email: v.optional(v.string()),
+    calendarId: v.string(), // "primary"
+  })
+    .index("by_staff", ["staffId"])
+    .index("by_business", ["businessId"]),
+
+  // Cached Google free/busy spans per staff — subtracted from open slots.
+  googleBusy: defineTable({
+    businessId: v.id("businesses"),
+    staffId: v.id("staff"),
+    start: v.number(),
+    end: v.number(),
+  })
+    .index("by_staff_start", ["staffId", "start"])
+    .index("by_business", ["businessId"]),
+
   // Per-staff weekly availability. One row per staff. `week` has 7 entries
   // (index 0 = Sunday); each holds open time intervals in minutes-from-midnight,
   // interpreted in `timezone`. `slotMinutes` is the appointment/slot length.

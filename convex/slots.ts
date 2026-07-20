@@ -21,9 +21,19 @@ async function busyFor(
       q.eq("staffId", staffId).gte("start", fromMs - DAY_MS).lt("start", toMs),
     )
     .collect();
-  return rows
+  const bookings = rows
     .filter((b) => b.status === "confirmed")
     .map((b) => ({ start: b.start, end: b.end }));
+
+  // Google Calendar busy times block slots too.
+  const gbusy = await ctx.db
+    .query("googleBusy")
+    .withIndex("by_staff_start", (q) =>
+      q.eq("staffId", staffId).gte("start", fromMs - DAY_MS).lt("start", toMs),
+    )
+    .collect();
+
+  return [...bookings, ...gbusy.map((g) => ({ start: g.start, end: g.end }))];
 }
 
 export const getSlots = query({
