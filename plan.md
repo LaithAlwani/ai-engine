@@ -10,7 +10,7 @@
 ## Build status
 - [x] **Phase M — Landing page** — "Molten Engine" marketing site: hero with a live self-demonstrating assistant, platform-tools grid, how-it-works + embed snippet, pricing tiers, FAQ, contact; `/services` + `/plans/[slug]`; direction-aware scroll navbar + progress line. Marketing stays `○ Static`.
 - [x] **Phase 0 — Tenancy foundation + auth** — Convex + Convex Auth (Password); multi-tenant schema (`businesses`, `memberships`, `staff`, `platformAdmins`, `auditLog` + authTables); `convex/lib/authz.ts` (`requireMember`, `requirePlatformAdmin`); onboarding action (owner membership + default calendar + hashed embed key); `proxy.ts` auth gate; `(app)` route group (Convex providers scoped out of marketing); sign-in + minimal dashboard. **4/4 isolation tests green.**
-- [ ] **Phase 1 — Knowledge, Chat, Dashboard** — dashboard shell `/dashboard/[businessSlug]` + business switcher + branding + Team page; per-tenant `knowledge`; per-tenant Leo prompt + real tool-use chat.
+- [x] **Phase 1 — Knowledge, Chat, Dashboard** — dashboard shell `/dashboard/[businessSlug]` + business switcher + branding + Team page; per-tenant `knowledge`; per-tenant Leo prompt + real tool-use chat.
 - [ ] **Phase 2 — Booking, Leads, Email, SMS** — per-employee booking + assignment + per-employee Google OAuth; leads CRM; per-tenant email; Twilio SMS; cron fan-out.
 - [ ] **Widget** — `public/widget.js` + `app/embed` + tenant-scoped `/api/chat`,`/api/book` + durable rate limit.
 - [ ] **Platform portal** — cross-tenant support portal (`app/platform/*`) + audit log.

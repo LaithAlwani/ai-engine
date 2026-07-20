@@ -95,6 +95,49 @@ export default defineSchema({
     createdAt: v.number(),
   }).index("by_user", ["userId"]),
 
+  // Appointments. `start`/`end` are UTC ms. Double-booking is prevented in the
+  // booking mutation (a transaction) via an overlap check on by_staff_start.
+  bookings: defineTable({
+    businessId: v.id("businesses"),
+    staffId: v.id("staff"),
+    start: v.number(),
+    end: v.number(),
+    status: v.union(v.literal("confirmed"), v.literal("cancelled")),
+    customerName: v.string(),
+    customerEmail: v.string(),
+    customerPhone: v.optional(v.string()),
+    serviceId: v.optional(v.string()),
+    note: v.optional(v.string()),
+    cancelToken: v.string(),
+    source: v.union(
+      v.literal("dashboard"),
+      v.literal("assistant"),
+      v.literal("widget"),
+    ),
+  })
+    .index("by_staff_start", ["staffId", "start"])
+    .index("by_business_start", ["businessId", "start"])
+    .index("by_cancelToken", ["cancelToken"]),
+
+  // Per-staff weekly availability. One row per staff. `week` has 7 entries
+  // (index 0 = Sunday); each holds open time intervals in minutes-from-midnight,
+  // interpreted in `timezone`. `slotMinutes` is the appointment/slot length.
+  availabilityRules: defineTable({
+    businessId: v.id("businesses"),
+    staffId: v.id("staff"),
+    timezone: v.string(),
+    slotMinutes: v.number(),
+    week: v.array(
+      v.object({
+        intervals: v.array(
+          v.object({ start: v.number(), end: v.number() }),
+        ),
+      }),
+    ),
+  })
+    .index("by_business", ["businessId"])
+    .index("by_staff", ["staffId"]),
+
   // Per-tenant business knowledge — the assistant's source of truth. One row
   // per business; edited in the dashboard, injected into the Leo system prompt.
   knowledge: defineTable({
