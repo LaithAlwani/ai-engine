@@ -4,6 +4,8 @@
 
 ## Progress log
 - **2026-07-19** — Greenfield kickoff. Plan reoriented from a migration plan to a **build-from-zero multi-tenant platform**; no anchor/dogfood tenant, no data migration. Phase M (AI Engine landing page) is first. This file created and committed.
+- **2026-07-19** — **Phase M shipped.** AI Engine landing page built ("Molten Engine" direction, `frontend-design` skill): hero with a live self-demonstrating assistant, platform tools, how-it-works, pricing tiers, FAQ, contact; `/services` + `/plans/[slug]`; direction-aware scroll navbar. Locked domain/deploy decision (1 repo → 1 Vercel project → many domains, `proxy.ts` hostname routing) + marketing performance guardrails.
+- **2026-07-20** — **Phase 0 shipped.** Convex + Convex Auth (Password) live; multi-tenant schema (`businesses`, `memberships`, `staff`, `platformAdmins`, `auditLog` + authTables, all `by_business_*`/`by_user_business` indexes); `convex/lib/authz.ts` (`requireMember`, `requirePlatformAdmin`, role hierarchy); onboarding action (owner membership + default calendar + hashed embed key); `proxy.ts` auth gate (`/dashboard`→`/signin` verified); `(app)` route group with Convex providers scoped out of marketing (marketing stays `○ Static`); sign-in + minimal dashboard harness. **Verified:** 4 `convex-test` isolation tests green (`npm test`). Seed the first operator with `npx convex run platform:seedAdmin '{"email":"…"}'`.
 
 ## Context
 
@@ -30,6 +32,21 @@ Use App Router **route groups** so bundles stay separate while logic is shared o
 - `app/embed/*` + `public/widget.js` — the embeddable widget surface (iframe).
 - `app/api/*` — tenant-scoped tool APIs (`/api/chat`, `/api/book`, `/api/sms`, `/api/event`).
 - Shared tools live once in `convex/*` (tenant-scoped) and `lib/*` — imported where needed, tree-shaken per route group. **That's the no-duplication guarantee.**
+
+### Domains & deployment (one project, many domains)
+**One repo → one Vercel project → many domains.** Not a separate project per surface — route groups already give bundle isolation (marketing never loads dashboard code), so splitting the repo would only fork the design system and double the build/env setup for no gain.
+- **`domain.com`** → the `(marketing)` group (public site).
+- **`app.domain.com`** → the `dashboard` + `platform` groups (the authed app), for a clean mental model and stronger cookie/security isolation between the public site and the app.
+- **Customer widget** loads on the *customer's own* domain via `<script src>` pointing back at this same project (`public/widget.js` → `app/embed` + `app/api/*`).
+- All domains attach to the same Vercel deployment; `proxy.ts` reads the `Host` header and rewrites each hostname to its route group. Path-based (`domain.com/dashboard`) stays possible — the split is config, not architecture.
+
+### Marketing performance guardrails (hold through every phase)
+Project size must **never** leak into the landing page's bundle. Per-route code splitting + static prerender already decouple them; these four rules keep it that way:
+1. **Root `app/layout.tsx` stays minimal** — fonts + `globals.css` only. No app-wide data/auth providers here.
+2. **Auth/Convex providers live in the `dashboard`/`platform` group layouts**, never root — so the marketing group never ships the Convex client or Auth runtime.
+3. **No marketing component imports from `convex/` or `app/dashboard/`.** Marketing reads only static content (Phase M) or its own tenant's public data via a lightweight server fetch — it never pulls tool modules.
+4. **`proxy.ts` matcher excludes static assets** so the edge hostname check never runs on `_next/*`, images, or fonts.
+Marketing pages stay `○ Static` (CDN-served, fixed-size HTML) regardless of how large the backend grows.
 
 ### Modular tool architecture (every tool is its own module)
 The platform is a set of **self-contained, pluggable tool modules** so a new tool can be added by dropping in one module — no edits scattered across the codebase ("never build twice", and easy to extend).
@@ -91,7 +108,7 @@ Execution principles from the skill:
 
 ## PHASE 0 — Tenancy Foundation + Auth (load-bearing; ship before any feature)
 
-**Convex Auth** (`labs.convex.dev/auth`): `npm i @convex-dev/auth @auth/core`, `npx @convex-dev/auth`; add `convex/auth.ts` (Password + optional Google), `convex/auth.config.ts`, spread `...authTables` into `convex/schema.ts` (managed `users`). Next side: `ConvexAuthNextjsServerProvider`, gate `/dashboard/:path*` with `convexAuthNextjsMiddleware`. Functions read the caller via `getAuthUserId(ctx)`. **Convex Auth from the start — no legacy HMAC/`ADMIN_WRITE_KEY` ever exists.**
+**Convex Auth** (`labs.convex.dev/auth`): `npm i @convex-dev/auth @auth/core`, `npx @convex-dev/auth`; add `convex/auth.ts` (Password + optional Google), `convex/auth.config.ts`, spread `...authTables` into `convex/schema.ts` (managed `users`). Next side: `ConvexAuthNextjsServerProvider`, gate the authed surface with `convexAuthNextjsMiddleware`. Functions read the caller via `getAuthUserId(ctx)`. **Hostname routing in `proxy.ts`** — rewrite `app.domain.com/*` to the `dashboard`/`platform` groups and `domain.com/*` to `(marketing)`, all from this one Vercel project (see Domains & deployment); the auth gate applies on the `app.` host. **Convex Auth from the start — no legacy HMAC/`ADMIN_WRITE_KEY` ever exists.**
 
 **New tables:**
 - `businesses` — `slug`(unique), `name`, `status`, `domains: string[]` (widget allow-list), `embedKeyHash` + `embedKeyPrefix`, `branding{logoStorageId?,primaryColor,accentColor,chatIcon,position,assistantName,welcomeMsg,tone}`, `aiSettings{persona,model?,guardrails?}`, `tier`, `templateId?`. Indexes: `by_slug`, `by_embedKeyPrefix`, `by_domain`.
