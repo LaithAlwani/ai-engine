@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { Logo } from "@/components/layout/logo";
@@ -96,6 +97,15 @@ export default function SignInPage() {
           </div>
 
           {error && <p className="text-sm text-ember-deep">{error}</p>}
+
+          {flow === "signIn" && (
+            <Link
+              href="/forgot-password"
+              className="-mt-1 self-end text-xs text-muted transition-colors hover:text-bone"
+            >
+              Forgot password?
+            </Link>
+          )}
 
           <button
             type="submit"

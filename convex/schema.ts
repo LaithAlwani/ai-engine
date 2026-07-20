@@ -94,6 +94,18 @@ export default defineSchema({
     createdAt: v.number(),
   }).index("by_user", ["userId"]),
 
+  // Single-use, hashed password-reset tokens (custom flow so the reset LINK
+  // works cross-device — the built-in flow binds the code to the requesting
+  // browser via a verifier, which an email link can't carry).
+  passwordResetTokens: defineTable({
+    userId: v.id("users"),
+    email: v.string(),
+    tokenHash: v.string(),
+    expiresAt: v.number(),
+  })
+    .index("by_tokenHash", ["tokenHash"])
+    .index("by_user", ["userId"]),
+
   // Audit trail for platform-admin cross-tenant actions + sensitive business ops.
   auditLog: defineTable({
     actorUserId: v.id("users"),

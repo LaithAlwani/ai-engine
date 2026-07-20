@@ -125,11 +125,12 @@ export const provision = internalMutation({
       role: "owner",
     });
 
-    // Default shared calendar: a login-less, staffId:null-style resource so
-    // booking works before any employees are added.
+    // Default shared calendar: a login-less resource named "Main" so booking
+    // works before any employees are added. Renamed from the business name so
+    // it reads as a calendar, not a person, on the Team page.
     await ctx.db.insert("staff", {
       businessId,
-      name: args.name,
+      name: "Main",
       bookable: true,
       active: true,
       order: 0,
